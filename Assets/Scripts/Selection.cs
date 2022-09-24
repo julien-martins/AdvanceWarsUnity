@@ -1,5 +1,4 @@
-﻿using JetBrains.Annotations;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -25,10 +24,6 @@ public class Selection : MonoBehaviour
         public int Y { get; private set; }
         public int Cout { get; set; }
         public int Heuristique { get; set; }
-        
-        //Pour Dijkstra
-        public float Distance { get; set; }
-        public List<Node> Neighbors { get; set; }
 
         public Node(Vector2Int coord, int cout)
         {
@@ -36,8 +31,6 @@ public class Selection : MonoBehaviour
             Y = coord.y;
             Cout = cout;
             Heuristique = 0;
-            Distance = Mathf.Infinity;
-            Neighbors = new List<Node>();
         }
 
         public Node(int x, int y, int cout, int heuristique)
@@ -46,8 +39,6 @@ public class Selection : MonoBehaviour
             Y = y;
             Cout = cout;
             Heuristique = heuristique;
-            Distance = Mathf.Infinity;
-            Neighbors = new List<Node>();
         }
 
         public override int GetHashCode()
@@ -88,9 +79,6 @@ public class Selection : MonoBehaviour
 
     private List<Vector2Int> pathFinding;
     private List<Vector2Int> possibleAttackMove;
-
-    //Dijkstra
-    private List<Node> graph;
 
     GameObject goSelectioned = null;
 
@@ -255,7 +243,7 @@ public class Selection : MonoBehaviour
         selectionMode = SelectionMode.Normal;
         goSelectioned = null;
 
-        //Debug.Log(allyName + " has attacked " + enemyName);
+        Debug.Log(allyName + " has attacked " + enemyName);
 
     }
 
@@ -344,20 +332,16 @@ public class Selection : MonoBehaviour
         return false;
     }
 
+    #region Algorithm A*
+
     void DrawPathFinding()
     {
         ClearAllCases(pathMap);
 
-        Node start = new Node(goSelectioned.GetComponent<Unit>().GetIndexPos(), 0);
-        Node end = new Node(Coord, 0);
-
-        //pathFinding = ShorterPath(start, end);
-        pathFinding = ShorterPathDijkstra(start, end);
-
+        pathFinding = ShorterPath(new Node(goSelectioned.GetComponent<Unit>().GetIndexPos(), 0), new Node(Coord, 0));
+        
         DrawAllCases(pathMap, pathFinding);
     }
-
-    #region Algorithm A*
 
     List<Vector2Int> ShorterPath(Node depart, Node arrive)
     {
@@ -398,10 +382,8 @@ public class Selection : MonoBehaviour
         return new List<Vector2Int>();
     }
 
-    //Calcule la distance entre deux noeuds
     int Distance(Node node1, Node node2) => Math.Abs(node1.X - node2.X) + Math.Abs(node1.Y - node2.Y);
 
-    //Retourne le noeuds avec la valeur heuristique la plus basse
     Node LessHeuristic(List<Node> list)
     {
         Node result = list[0];
@@ -430,155 +412,80 @@ public class Selection : MonoBehaviour
 
     #endregion
 
-    #region Dijkstra
-
-    Node DijkstraMin(List<Node> Q)
-    {
-        Node result = new Node();
-        float mini = Mathf.Infinity;
-
-        foreach(Node n in Q)
-        {
-            if(n.Distance < mini)
-            {
-                mini = n.Distance;
-                result = n;
-            }
-        }
-
-        return result; 
-    }
-
-    void DijkstraMajSommet(Node s1, Node s2, Dictionary<Node, Node> parents)
-    {
-        if(s2.Distance > s1.Distance + s2.Cout)
-        {
-            s2.Distance = s1.Distance + s2.Cout;
-            parents.Add(s2, s1);
-        }
-    }
-
-    List<Vector2Int> ShorterPathDijkstra(Node depart, Node arrive)
-    {
-        Vector2Int[] dirToCheck = { new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, -1), new Vector2Int(0, 1) };
-
-        Dictionary<Node, Node> parents = new Dictionary<Node, Node>();
-
-        for(int i = 0; i < graph.Count; ++i)
-        {
-            Node n = graph[i];
-            n.Distance = Mathf.Infinity;
-            
-            if (n.Equals(depart))
-                n.Distance = 0;
-            else
-                n.Distance = Mathf.Infinity;
-
-            graph[i] = n;
-        }
-        
-        while (graph.Count > 0)
-        {
-            Node s1 = DijkstraMin(graph);
-            graph.Remove(s1);
-
-            foreach (Node s2 in s1.Neighbors)
-            {
-                if (s2.Equals(arrive))
-                {
-                    return RecoverPath(parents, s2);
-                }
-                else
-                {
-                    DijkstraMajSommet(s1, s2, parents);
-                }
-            }
-
-        }
-
-        return new List<Vector2Int>();
-    }
-
-
-    #endregion
-
     #region SelectionRegion
-    void DrawPossibleRange()
-    {
-        ClearAllCases(displacementMap);
-        //Calculate possile tile where the unit can move
-        Unit unit = goSelectioned.GetComponent<Unit>();
-        List<Vector2Int> coords = SearchAllCasesInPossibleRange(unit.GetIndexPos(), 
-                                                                unit.PM, 
-                                                                SelectionRegionCondition);
+        void DrawPossibleRange()
+        {
+            ClearAllCases(displacementMap);
+            //Calculate possile tile where the unit can move
+            Unit unit = goSelectioned.GetComponent<Unit>();
+            List<Vector2Int> coords = SearchAllCasesInPossibleRange(unit.GetIndexPos(), 
+                                                                    unit.PM, 
+                                                                    SelectionRegionCondition);
 
-        DrawAllCases(displacementMap, coords);
+            DrawAllCases(displacementMap, coords);
             
-    }
+        }
 
-    bool SelectionRegionCondition(int x, int y)
-    {
+        bool SelectionRegionCondition(int x, int y)
+        {
         return MapManager.Instance.IsObstacles(goSelectioned.GetComponent<Unit>().GetDeniedAccess(), x, y)
-            || HasUnit(x, y);
-    }
+                || HasUnit(x, y);
+        }
 
-    List<Vector2Int> SearchAllCasesInPossibleRange(Vector2Int startPos, int range, Func<int, int, bool> condition)
-    {
-        Vector2Int[] dirToCheck = { new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, -1), new Vector2Int(0, 1) };
-
-        List<Node> openList = new List<Node>();
-        List<Node> closedList = new List<Node>();
-
-        List<Vector2Int> result = new List<Vector2Int>();
-
-        openList.Add(new Node(startPos, 0));
-
-        while(openList.Count != 0)
+        List<Vector2Int> SearchAllCasesInPossibleRange(Vector2Int startPos, int range, Func<int, int, bool> condition)
         {
-            Node tile = openList[0];
-            openList.RemoveAt(0);
-            for (int i = 0; i < 4; i++)
+            Vector2Int[] dirToCheck = { new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, -1), new Vector2Int(0, 1) };
+
+            List<Node> openList = new List<Node>();
+            List<Node> closedList = new List<Node>();
+
+            List<Vector2Int> result = new List<Vector2Int>();
+
+            openList.Add(new Node(startPos, 0));
+
+            while(openList.Count != 0)
             {
-
-                Vector2Int newPos = new Vector2Int(tile.X + dirToCheck[i].x, tile.Y + dirToCheck[i].y);
-                int newF = tile.Cout + 1;
-                Node neighbors = new Node(newPos, newF);
-
-                tile.Neighbors.Add(neighbors);
-                    
-                if (newF <= range && !openList.Contains(neighbors) && !closedList.Contains(neighbors) 
-                    && !condition(newPos.x, newPos.y))
+                Node tile = openList[0];
+                openList.RemoveAt(0);
+                for (int i = 0; i < 4; i++)
                 {
-                    openList.Add(neighbors);
+
+                    Vector2Int newPos = new Vector2Int(tile.X + dirToCheck[i].x, tile.Y + dirToCheck[i].y);
+                    int newF = tile.Cout + 1;
+                    Node neighbors = new Node(newPos, newF);
+                    
+                    if (newF <= range && !openList.Contains(neighbors) && !closedList.Contains(neighbors) 
+                        && !condition(newPos.x, newPos.y))
+                    {
+                        openList.Add(neighbors);
+                    }
+
                 }
-
+                closedList.Add(tile);
             }
-            closedList.Add(tile);
-        }
 
-        foreach (Node n in closedList)
-        {
-            graph.Add(n);
-            result.Add(new Vector2Int(n.X, n.Y));
-        }
+            foreach (Node n in closedList)
+            {
+                result.Add(new Vector2Int(n.X, n.Y));
+            }
 
-        return result;
-    }
-    void DrawAllCases(Tilemap tilemap, Tile tile, List<Vector2Int> coords)
-    {
-        foreach (Vector2Int coord in coords)
-        {
-            tilemap.SetTile(new Vector3Int(coord.x, coord.y, 0), tile);
+            return result;
         }
-    }
-    void DrawAllCases(Tilemap tilemap, List<Vector2Int> coords)
-    {
-        DrawAllCases(tilemap, displacementTile, coords);
-    }
-    void ClearAllCases(Tilemap tilemap)
-    {
-        tilemap.ClearAllTiles();
-    }
+        void DrawAllCases(Tilemap tilemap, Tile tile, List<Vector2Int> coords)
+        {
+            foreach (Vector2Int coord in coords)
+            {
+                tilemap.SetTile(new Vector3Int(coord.x, coord.y, 0), tile);
+            }
+        }
+        void DrawAllCases(Tilemap tilemap, List<Vector2Int> coords)
+        {
+            DrawAllCases(tilemap, displacementTile, coords);
+        }
+        void ClearAllCases(Tilemap tilemap)
+        {
+            tilemap.ClearAllTiles();
+        }
     #endregion
 
 }

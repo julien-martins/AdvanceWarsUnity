@@ -62,11 +62,11 @@ public class GameManager : MonoBehaviour
 
     private void Update()
     {
-        //Debug.Log(splashcreenTimerIsRunning);
+        Debug.Log(splashcreenTimerIsRunning);
         if (splashcreenTimerIsRunning)
         {
             splashcreenCoutdown -= Time.deltaTime;
-            //Debug.Log(splashcreenCoutdown);
+            Debug.Log(splashcreenCoutdown);
             if(splashcreenCoutdown <= 0)
             {
                 splashcreenCoutdown = 1;
